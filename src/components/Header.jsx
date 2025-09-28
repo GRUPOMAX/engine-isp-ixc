@@ -12,16 +12,20 @@ function DrawerPortal({ open, onClose, children }) {
         onClick={onClose}
       />
       <aside
-        className={`fixed right-0 z-[1000] w-[80%] max-w-xs border-l border-neutral-800 
-        bg-neutral-950 text-neutral-200 shadow-xl transition-transform duration-300 
-        ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed right-0 z-[1000] w-[80%] max-w-xs border-l border-neutral-800
+        bg-neutral-950 text-neutral-200 shadow-xl transition-transform duration-300
+        ${open ? "translate-x-0" : "translate-x-full"} overscroll-contain`}
         role="dialog"
         aria-modal="true"
-        // empurra o conteúdo para baixo do notch/status bar e corrige a altura
         style={{
           top: 0,
+          // altura correta em mobile (inclui barras dinâmicas do navegador)
+          height: '100dvh',
+          // safe-areas: notch em cima e barra/gestos embaixo
           paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)',
-          height: 'calc(100% - env(safe-area-inset-top, 0px))',
+          paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)',
+          // se o conteúdo crescer, rola dentro do drawer, não por trás
+          overflowY: 'auto',
         }}
       >
         {children}
@@ -30,6 +34,7 @@ function DrawerPortal({ open, onClose, children }) {
     document.body
   );
 }
+
 
 
 export default function Header({ onToggleTheme, isAuthed, onLogout }) {

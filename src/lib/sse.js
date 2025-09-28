@@ -143,7 +143,7 @@ export function connectSSE(arg1, arg2 = {}) {
         console.error("[SSE onOpen error]", serializeErr(err));
       }
       // log leve para iOS
-      console.log("[SSE open]", { url: finalUrl });
+      //console.log("[SSE open]", { url: finalUrl });
     });
 
     es.addEventListener("error", (ev) => {
