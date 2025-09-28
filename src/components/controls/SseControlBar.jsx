@@ -1,5 +1,5 @@
 // src/components/controls/SseControlBar.jsx
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 export default function SseControlBar({
   connected,
@@ -13,58 +13,67 @@ export default function SseControlBar({
 }) {
   const ref = useRef(null);
 
+  // garante foco=all sempre
   useEffect(() => {
-    if (ref.current) ref.current.value = String(interval);
+    if (focus !== "all") setFocus?.("all");
+  }, [focus, setFocus]);
+
+  // espelha o valor do intervalo no input
+  useEffect(() => {
+    if (ref.current) ref.current.value = String(interval ?? "");
   }, [interval]);
 
+  const badgeTone = connected
+    ? "border-emerald-500/70 text-emerald-400 bg-emerald-500/10"
+    : "border-amber-500/70 text-amber-400 bg-amber-500/10";
+
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 border ${connected ? "border-emerald-500 text-emerald-400" : "border-amber-500 text-amber-400"}`}>
+    <div className="w-full rounded-xl border border-neutral-200/60 dark:border-neutral-800/70 bg-white/40 dark:bg-neutral-900/40 backdrop-blur p-2.5 md:p-3 flex flex-wrap items-center gap-2 md:gap-3">
+      {/* status */}
+      <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs border ${badgeTone}`}>
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-500" : "bg-amber-500"}`} />
-        {connected ? "conectado" : "reconectando…"}
+        {connected ? "SSE: conectado" : "SSE: reconectando…"}
       </span>
 
-      <div className="opacity-70">
-        latência: {latencyMs != null ? `${latencyMs} ms` : '—'}
-      </div>
+      {/* latência */}
+      <span className="text-xs opacity-80">
+        latência: <b>{latencyMs != null ? `${latencyMs} ms` : "—"}</b>
+      </span>
 
-  <label className="inline-flex items-center gap-2 ml-auto">
-    <span className="opacity-70">foco</span>
-    <select
-      className="rounded-md bg-neutral-900/40 border border-neutral-700 px-2 py-1"
-      value={focus}
-      onChange={(e) => setFocus(e.target.value)}
-      title="Filtra visualmente pelo canal/origem dos eventos"
-    >
-     <option value="all">todos</option>
-      <option value="heartbeat">heartbeat</option>
-      <option value="sync">sync</option>
-      <option value="reconcile">reconcile</option>
-      <option value="events">events</option>
-      <option value="healthz">healthz</option>
-      <option value="isp">isp</option>
-      <option value="ixc">ixc</option>
-    </select>
-  </label>
+      {/* foco fixo */}
+      <span
+        className="ml-auto inline-flex items-center gap-2 rounded-lg border border-neutral-300/60 dark:border-neutral-700/70 bg-neutral-50/60 dark:bg-neutral-800/50 px-2.5 py-1 text-[11px]"
+        title="Canal de foco"
+      >
+        foco: <b className="tracking-wide">todos</b>
+      </span>
 
-      <label className="inline-flex items-center gap-2">
+      {/* intervalo */}
+      <label className="inline-flex items-center gap-1.5 text-xs">
         <span className="opacity-70">intervalo</span>
-        <input
-          ref={ref}
-          type="number"
-          min={250}
-          step={250}
-          className="w-20 rounded-md bg-neutral-900/40 border border-neutral-700 px-2 py-1"
-          onChange={(e) => setIntervalMs(Number(e.target.value || 1000))}
-        />
-        <span>ms</span>
+        <div className="relative">
+          <input
+            ref={ref}
+            type="number"
+            min={250}
+            step={250}
+            inputMode="numeric"
+            className="w-24 rounded-md bg-neutral-900/30 dark:bg-neutral-900/40 border border-neutral-300/60 dark:border-neutral-700/70 px-2 py-1 pr-8"
+            onChange={(e) => setIntervalMs(Number(e.target.value || 1000))}
+            aria-label="Intervalo em milissegundos"
+          />
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] opacity-70">
+            ms
+          </span>
+        </div>
       </label>
 
+      {/* pause/continue */}
       <button
         onClick={onPauseToggle}
-        className="rounded-md border border-neutral-700 px-2 py-1 hover:bg-neutral-800/50"
+        className="text-xs rounded-lg border border-neutral-300/60 dark:border-neutral-700/70 px-2.5 py-1 hover:bg-neutral-100/70 dark:hover:bg-neutral-800/60 transition-colors"
       >
-        {paused ? 'Continuar' : 'Pausar'}
+        {paused ? "Continuar" : "Pausar"}
       </button>
     </div>
   );

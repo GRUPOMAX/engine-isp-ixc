@@ -142,7 +142,7 @@ export default function AdminNeural() {
 
       <div className="mx-auto max-w-6xl px-4 py-4 sm:py-6">
         <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">Neural Console</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Neural</h1>
           <SseControlBar
             connected={connected && !paused}
             latencyMs={latencyMs}

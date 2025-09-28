@@ -9,16 +9,15 @@ import EventLog from "@/components/EventLog";
 import AdminNeural from "@/pages/AdminNeural";
 import Login from "@/pages/Login";
 import CacheSyncPage from "@/pages/CacheSyncPage";
+import AdminConfig from "@/pages/AdminConfig";
 
 function Protected({ children }) {
   const { isAuthed } = useAuth();
   const location = useLocation();
-  // se não logado, manda pro /login guardando origem
   if (!isAuthed) return <Navigate to="/login" replace state={{ from: location }} />;
   return children;
 }
 
-// App.jsx – dentro de Shell
 function Shell({ children }) {
   const { toggle } = useTheme();
   const { isAuthed, logout } = useAuth();
@@ -29,7 +28,6 @@ function Shell({ children }) {
     </div>
   );
 }
-
 
 function Dashboard() {
   return (
@@ -74,6 +72,15 @@ export default function App() {
         element={
           <Protected>
             <Shell><CacheSyncPage /></Shell>
+          </Protected>
+        }
+      />
+      {/* NOVO: página de configuração */}
+      <Route
+        path="/config"
+        element={
+          <Protected>
+            <Shell><AdminConfig /></Shell>
           </Protected>
         }
       />

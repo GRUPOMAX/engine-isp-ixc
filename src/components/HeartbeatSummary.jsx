@@ -12,12 +12,85 @@ function fmtSecs(s) {
   if (m) return `${m}m ${sec}s`;
   return `${sec}s`;
 }
-
 function fmtEta(ms) {
   if (ms == null) return "—";
   const s = Math.max(0, Math.round(ms / 1000));
   return fmtSecs(s);
 }
+
+/* -------------------- NORMALIZAÇÃO -------------------- */
+function getNum(x) {
+  if (x == null) return null;
+  const n = typeof x === "string" ? Number(x) : x;
+  return Number.isFinite(n) ? n : null;
+}
+function msToMin(ms) {
+  const n = getNum(ms);
+  return n == null ? null : Math.round(n / 60000);
+}
+function secToMin(sec) {
+  const n = getNum(sec);
+  return n == null ? null : Math.round(n / 60);
+}
+function normalizeIntervals(hb = {}) {
+  const raw = hb.intervalMinutes || hb.intervals || {};
+  const syncMin =
+    getNum(raw.sync) ??
+    getNum(hb.syncMinutes) ??
+    secToMin(hb.syncSeconds) ??
+    msToMin(hb.syncMs) ??
+    getNum(hb.sync_min) ??
+    getNum(hb.syncIntervalMin) ??
+    1;
+  const reconcileMin =
+    getNum(raw.reconcile) ??
+    getNum(hb.reconcileMinutes) ??
+    secToMin(hb.reconcileSeconds) ??
+    msToMin(hb.reconcileMs) ??
+    getNum(hb.reconcile_min) ??
+    getNum(hb.reconcileIntervalMin) ??
+    null;
+  return { sync: syncMin, reconcile: reconcileMin };
+}
+function normalizeHb(hb = {}) {
+  const startedAt = hb.startedAt ?? hb.started_at ?? hb.startAt ?? null;
+  const lastTickAt = hb.lastTickAt ?? hb.last_tick_at ?? hb.lastTick ?? null;
+  const lastOkAt = hb.lastOkAt ?? hb.last_ok_at ?? hb.lastOK ?? null;
+
+  const upForSeconds =
+    getNum(hb.upForSeconds) ?? getNum(hb.uptimeSec) ?? getNum(hb.uptime) ?? null;
+
+  const staleForSeconds =
+    getNum(hb.staleForSeconds) ?? getNum(hb.staleSec) ?? getNum(hb.stale) ?? null;
+
+  const ticksTotal =
+    getNum(hb.ticksTotal) ?? getNum(hb.ticks_total) ?? getNum(hb.totalTicks) ?? 0;
+
+  const consecutiveErrors =
+    getNum(hb.consecutiveErrors) ?? getNum(hb.errorsInARow) ?? getNum(hb.err_seq) ?? null;
+
+  const status = hb.status ?? hb.state ?? null;
+  const intervalMinutes = normalizeIntervals(hb);
+  const lastError = hb.lastError ?? hb.error ?? null;
+  const service = hb.service ?? hb.name ?? "engine";
+  const lastSummary = hb.lastSummary ?? hb.summary ?? null;
+
+  return {
+    service,
+    startedAt,
+    lastTickAt,
+    lastOkAt,
+    lastError,
+    consecutiveErrors,
+    ticksTotal,
+    lastSummary,
+    upForSeconds,
+    staleForSeconds,
+    status,
+    intervalMinutes,
+  };
+}
+/* ----------------------------------------------------- */
 
 /**
  * Props:
@@ -31,7 +104,7 @@ export default function HeartbeatSummary({
   sse = {},
   showLegends,
   setShowLegends,
-  now: nowProp, // ✅ agora o prop existe
+  now: nowProp,
 }) {
   const [showRaw, setShowRaw] = useState(false);
   const [nowLocal, setNowLocal] = useState(() => Date.now());
@@ -45,6 +118,8 @@ export default function HeartbeatSummary({
 
   const now = nowProp ?? nowLocal;
 
+  // ⬇️ normalize antes de usar
+  const H = useMemo(() => normalizeHb(hb || {}), [hb]);
   const {
     service,
     startedAt,
@@ -58,7 +133,7 @@ export default function HeartbeatSummary({
     staleForSeconds,
     status,
     intervalMinutes,
-  } = hb || {};
+  } = H;
 
   const { connected: sseConnected, latencyMs: sseLatencyMs, serverNow } = sse;
 
@@ -82,14 +157,16 @@ export default function HeartbeatSummary({
 
   const staleDisplaySec = computedStaleSec ?? 0;
 
+  // ETA do próximo tick (usa serverNow se tiver; senão now local)
   const nextEtaMs = useMemo(() => {
     const syncMin = intervalMinutes?.sync;
-    if (!syncMin || !lastTickAt || !serverNow) return null;
+    if (!syncMin || !lastTickAt) return null;
     const last = typeof lastTickAt === "number" ? lastTickAt : new Date(lastTickAt).getTime();
+    const baseNow = serverNow ?? now;
     const intervalMs = syncMin * 60_000;
     const nextAt = last + intervalMs;
-    return nextAt - serverNow;
-  }, [intervalMinutes, lastTickAt, serverNow]);
+    return nextAt - baseNow;
+  }, [intervalMinutes, lastTickAt, serverNow, now]);
 
   const derivedStatus = useMemo(() => {
     if (status) return status;
@@ -179,7 +256,9 @@ export default function HeartbeatSummary({
           label="Intervalos"
           value={
             intervalMinutes
-              ? `sync: ${intervalMinutes.sync}m • reconcile: ${intervalMinutes.reconcile}m`
+              ? `sync: ${intervalMinutes.sync}m • reconcile: ${
+                  intervalMinutes.reconcile != null ? intervalMinutes.reconcile + "m" : "—"
+                }`
               : "—"
           }
         />

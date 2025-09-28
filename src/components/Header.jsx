@@ -19,12 +19,9 @@ function DrawerPortal({ open, onClose, children }) {
         aria-modal="true"
         style={{
           top: 0,
-          // altura correta em mobile (inclui barras dinâmicas do navegador)
           height: '100dvh',
-          // safe-areas: notch em cima e barra/gestos embaixo
           paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)',
           paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)',
-          // se o conteúdo crescer, rola dentro do drawer, não por trás
           overflowY: 'auto',
         }}
       >
@@ -34,8 +31,6 @@ function DrawerPortal({ open, onClose, children }) {
     document.body
   );
 }
-
-
 
 export default function Header({ onToggleTheme, isAuthed, onLogout }) {
   const [open, setOpen] = useState(false);
@@ -47,9 +42,7 @@ export default function Header({ onToggleTheme, isAuthed, onLogout }) {
     return () => (document.body.style.overflow = prevOverflow || "");
   }, [open]);
 
-  const onKey = useCallback((e) => {
-    if (e.key === "Escape") setOpen(false);
-  }, []);
+  const onKey = useCallback((e) => { if (e.key === "Escape") setOpen(false); }, []);
   useEffect(() => {
     if (!open) return;
     window.addEventListener("keydown", onKey);
@@ -83,7 +76,6 @@ export default function Header({ onToggleTheme, isAuthed, onLogout }) {
 
   return (
     <>
-      {/* Header com padding-top respeitando o notch (iOS/Android) */}
       <header
         className="sticky top-0 z-20 border-b border-neutral-200 dark:border-neutral-800 backdrop-blur bg-neutral-50/70 dark:bg-neutral-950/70"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
@@ -115,13 +107,21 @@ export default function Header({ onToggleTheme, isAuthed, onLogout }) {
                 >
                   Cache
                 </a>
+                {/* NOVO: Config */}
+                <a
+                  href="/#/config"
+                  className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors"
+                  title="Configurações do Engine"
+                >
+                  Config
+                </a>
               </>
             )}
             {ThemeBtn}
             {LogoutOrLogin}
           </nav>
 
-          {/* Mobile: botão hamburguer (continua no topo) */}
+          {/* Mobile: botão hamburguer */}
           <button
             className="md:hidden inline-flex items-center justify-center rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm"
             aria-label="Abrir menu"
@@ -173,6 +173,14 @@ export default function Header({ onToggleTheme, isAuthed, onLogout }) {
                   onClick={() => setOpen(false)}
                 >
                   Cache
+                </a>
+                {/* NOVO: Config (mobile) */}
+                <a
+                  href="/#/config"
+                  className="block rounded-lg px-3 py-2 text-sm hover:bg-neutral-900 hover:text-cyan-300"
+                  onClick={() => setOpen(false)}
+                >
+                  Config
                 </a>
               </div>
             )}
