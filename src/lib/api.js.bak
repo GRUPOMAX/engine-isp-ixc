@@ -1,0 +1,24 @@
+import axios from 'axios';
+
+
+const api = axios.create({
+baseURL: import.meta.env.VITE_API_BASE?.replace(/\/$/, '') || '',
+headers: { 'Content-Type': 'application/json' },
+});
+
+
+export async function getHealth() {
+const { data } = await api.get('/healthz', { headers: { 'Cache-Control': 'no-store' } });
+return data;
+}
+export async function getHeartbeat() {
+const { data } = await api.get('/heartbeat', { headers: { 'Cache-Control': 'no-store' } });
+return data;
+}
+export async function refreshCache() {
+const { data } = await api.post('/cache/refresh');
+return data;
+}
+
+
+export default api;

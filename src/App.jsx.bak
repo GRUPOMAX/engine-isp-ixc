@@ -1,0 +1,11 @@
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import DashboardHome from '@/pages/DashboardHome';
+
+
+export default function App() {
+return (
+<DashboardLayout>
+<DashboardHome />
+</DashboardLayout>
+);
+}

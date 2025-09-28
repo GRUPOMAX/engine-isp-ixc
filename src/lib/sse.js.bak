@@ -1,0 +1,29 @@
+// Cliente SSE com reconexão simples
+export function connectSSE(url, { onMessage, onOpen, onError } = {}) {
+let ev; let closed = false; let retry = 1000;
+
+
+const open = () => {
+ev = new EventSource(url, { withCredentials: false });
+ev.onopen = (e) => { retry = 1000; onOpen?.(e); };
+ev.onerror = (e) => {
+onError?.(e);
+ev.close();
+if (!closed) setTimeout(open, Math.min(retry *= 1.5, 15000));
+};
+ev.onmessage = (e) => onMessage?.({ event: 'message', data: parse(e.data) });
+// Eventos nomeados
+['refresh','update','sync','heartbeat','error'].forEach((name) => {
+ev.addEventListener(name, (e) => onMessage?.({ event: name, data: parse(e.data) }));
+});
+};
+
+
+open();
+return () => { closed = true; ev?.close(); };
+}
+
+
+function parse(s) {
+try { return JSON.parse(s); } catch { return s; }
+}

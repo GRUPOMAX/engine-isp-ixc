@@ -1,0 +1,51 @@
+import { useEffect, useRef, useState } from 'react';
+import { Bolt } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { connectSSE } from '@/lib/sse';
+
+
+export default function EventLog() {
+const [events, setEvents] = useState([]);
+const listRef = useRef(null);
+
+
+useEffect(() => {
+const base = import.meta.env.VITE_API_BASE?.replace(/\/$/, '') || '';
+const stop = connectSSE(`${base}/events`, {
+onOpen: () => push({ event: 'open', data: 'Conectado' }),
+onError: () => push({ event: 'error', data: 'Erro/Reconectando…' }),
+onMessage: (evt) => push(evt),
+});
+return stop;
+}, []);
+
+
+function push(evt) {
+setEvents((arr) => {
+const next = [...arr, { ...evt, ts: Date.now() }].slice(-200);
+queueMicrotask(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight }));
+return next;
+});
+}
+
+
+return (
+<Card className="h-[360px] flex flex-col">
+<CardHeader>
+<CardTitle className="flex items-center gap-2"><Bolt size={16}/> Eventos (SSE)</CardTitle>
+<span className="text-xs text-neutral-500">/events</span>
+</CardHeader>
+<CardContent>
+<div ref={listRef} className="h-64 overflow-auto rounded-lg border border-neutral-200 dark:border-neutral-800 p-3 text-xs font-mono">
+{events.map((e, i) => (
+<div key={i} className="py-0.5">
+<span className="text-neutral-500">[{new Date(e.ts).toLocaleTimeString()}]</span>
+<span className="mx-2 px-1 rounded bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">{e.event}</span>
+<span className="ml-2 break-all">{typeof e.data === 'string' ? e.data : JSON.stringify(e.data)}</span>
+</div>
+))}
+</div>
+</CardContent>
+</Card>
+);
+}
