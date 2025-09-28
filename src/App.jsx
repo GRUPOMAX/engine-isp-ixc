@@ -18,16 +18,18 @@ function Protected({ children }) {
   return children;
 }
 
+// App.jsx – dentro de Shell
 function Shell({ children }) {
   const { toggle } = useTheme();
   const { isAuthed, logout } = useAuth();
   return (
     <div className="min-h-screen overflow-x-hidden">
       <Header onToggleTheme={toggle} isAuthed={isAuthed} onLogout={logout} />
-      <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6 pb-24 md:pb-6">{children}</main>
     </div>
   );
 }
+
 
 function Dashboard() {
   return (
