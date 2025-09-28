@@ -10,4 +10,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  build: {
+    sourcemap: true, // gera mapas de fonte no build final
+    target: 'es2018', // opcional, ajuda em compatibilidade
+  },
 });
