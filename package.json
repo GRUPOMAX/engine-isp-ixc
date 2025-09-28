@@ -3,17 +3,19 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "build:domain": "vite build --base=/",
-    "build:pages":  "vite build --base=/engine-isp-ixc/",
-    "deploy:domain": "vite build --base=/ && echo engine.appsy.app.br> dist/CNAME && shx cp dist/index.html dist/404.html && gh-pages -d dist -b gh-pages -r https://github.com/GRUPOMAX/engine-isp-ixc.git",
-    "deploy:pages":  "vite build --base=/engine-isp-ixc/ && shx cp dist/index.html dist/404.html && gh-pages -d dist -b gh-pages -r https://github.com/GRUPOMAX/engine-isp-ixc.git",
+    "scripts": {
+      "dev": "vite",                  
+      "build:domain": "vite build --base=/",
+      "build:pages": "vite build --base=/engine-isp-ixc/",
+      "deploy:domain": "vite build --base=/ && echo engine.appsy.app.br> dist/CNAME && shx cp dist/index.html dist/404.html && gh-pages -d dist -b gh-pages -r https://github.com/GRUPOMAX/engine-isp-ixc.git",
+      "deploy:pages": "vite build --base=/engine-isp-ixc/ && shx cp dist/index.html dist/404.html && gh-pages -d dist -b gh-pages -r https://github.com/GRUPOMAX/engine-isp-ixc.git",
 
-    "git:push": "git add . && git commit -m \"deploy automático\" && git push origin main",
-    
-    "predeploy": "npm run build:domain",
-    "deploy": "npm run deploy:domain && npm run git:push"
-  },
+      "git:push": "git add . && git commit -m \"deploy automático\" && git push origin main",
+      
+      "predeploy": "npm run build:domain",
+      "deploy": "npm run deploy:domain && npm run git:push"
+    }
+,
   "dependencies": {
     "axios": "^1.12.2",
     "clsx": "^2.1.1",

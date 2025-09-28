@@ -12,11 +12,17 @@ function DrawerPortal({ open, onClose, children }) {
         onClick={onClose}
       />
       <aside
-        className={`fixed top-0 right-0 z-[1000] h-full w-[80%] max-w-xs border-l border-neutral-800 
+        className={`fixed right-0 z-[1000] w-[80%] max-w-xs border-l border-neutral-800 
         bg-neutral-950 text-neutral-200 shadow-xl transition-transform duration-300 
         ${open ? "translate-x-0" : "translate-x-full"}`}
         role="dialog"
         aria-modal="true"
+        // empurra o conteúdo para baixo do notch/status bar e corrige a altura
+        style={{
+          top: 0,
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)',
+          height: 'calc(100% - env(safe-area-inset-top, 0px))',
+        }}
       >
         {children}
       </aside>
@@ -24,6 +30,7 @@ function DrawerPortal({ open, onClose, children }) {
     document.body
   );
 }
+
 
 export default function Header({ onToggleTheme, isAuthed, onLogout }) {
   const [open, setOpen] = useState(false);

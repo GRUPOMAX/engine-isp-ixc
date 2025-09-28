@@ -48,7 +48,10 @@ export function registerSW() {
         }
       }
 
-      const reg = await navigator.serviceWorker.register(swUrl, { scope: BASE });
+       const reg = await navigator.serviceWorker.register(swUrl, {
+          scope: BASE,
+          updateViaCache: 'none' // garante que o SW novo não venha de cache
+        });
 
       // Se já existe controlador (ou seja, não é o primeiríssimo load), aplicamos hot-swap
       reg.addEventListener('updatefound', () => {

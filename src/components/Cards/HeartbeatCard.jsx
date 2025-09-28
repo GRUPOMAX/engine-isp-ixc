@@ -80,9 +80,17 @@ export default function HeartbeatCard() {
   const [ts, setTs] = useState("");
   const [err, setErr] = useState("");
 
+  // 🎯 novo: relógio local de 1s para animar uptime/stale
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   async function load() {
     try {
-      const r = await api.heartbeat();
+      // evita SW/cache prender resposta antiga
+      const r = await api.heartbeat({ cache: "no-store" });
       setHb(r);
       setErr("");
       setTs(new Date().toLocaleString());
@@ -98,6 +106,28 @@ export default function HeartbeatCard() {
     return () => clearInterval(id);
   }, []);
 
+  // ⏱️ uptime derivado (fica “vivo” entre os polls)
+  const upSec = useMemo(() => {
+    if (hb?.startedAt) {
+      const started = typeof hb.startedAt === "number"
+        ? hb.startedAt
+        : new Date(hb.startedAt).getTime();
+      return Math.max(0, Math.floor((now - started) / 1000));
+    }
+    return hb?.upForSeconds ?? 0;
+  }, [hb?.startedAt, hb?.upForSeconds, now]);
+
+  // 🟡 stale derivado (sobe por segundo até chegar tick novo)
+  const staleSec = useMemo(() => {
+    if (hb?.lastTickAt) {
+      const last = typeof hb.lastTickAt === "number"
+        ? hb.lastTickAt
+        : new Date(hb.lastTickAt).getTime();
+      return Math.max(0, Math.floor((now - last) / 1000));
+    }
+    return hb?.staleForSeconds ?? 0;
+  }, [hb?.lastTickAt, hb?.staleForSeconds, now]);
+
   const progress = useMemo(() => {
     const sum = hb?.lastSummary || {};
     if (typeof sum.total_clientes === "number" && typeof sum.processados === "number") {
@@ -112,8 +142,8 @@ export default function HeartbeatCard() {
 
   const isOk = hb?.status === "ok" && !hb?.consecutiveErrors;
   const statusDot = isOk ? "bg-emerald-500" : "bg-red-500";
-  const staleWarn = (hb?.staleForSeconds ?? 0) > 30;
-
+  const staleWarn = staleSec > 30;
+  
   /* gira quando fase = sync ou reconcile */
   const running = hb?.status === "ok" &&
     ["sync", "reconcile"].includes(hb?.lastSummary?.fase ?? "");

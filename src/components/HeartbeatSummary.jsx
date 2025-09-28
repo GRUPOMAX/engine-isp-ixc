@@ -1,5 +1,5 @@
 // src/components/HeartbeatSummary.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function fmtSecs(s) {
   if (s == null) return "-";
@@ -23,10 +23,27 @@ function fmtEta(ms) {
  * Props:
  *  - hb: objeto heartbeat do backend
  *  - sse: { connected:boolean, latencyMs:number|null, serverNow:number|null }
- *  - showLegends:boolean, setShowLegends: fn (para o toggle da “legenda embaixo”)
+ *  - showLegends:boolean, setShowLegends: fn
+ *  - now: number (opcional) — timestamp ms vindo de fora para sincronizar relógio
  */
-export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLegends }) {
+export default function HeartbeatSummary({
+  hb,
+  sse = {},
+  showLegends,
+  setShowLegends,
+  now: nowProp, // ✅ agora o prop existe
+}) {
   const [showRaw, setShowRaw] = useState(false);
+  const [nowLocal, setNowLocal] = useState(() => Date.now());
+
+  // relógio interno de 1s quando não vier "now" por prop
+  useEffect(() => {
+    if (nowProp != null) return;
+    const t = setInterval(() => setNowLocal(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [nowProp]);
+
+  const now = nowProp ?? nowLocal;
 
   const {
     service,
@@ -38,42 +55,50 @@ export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLeg
     ticksTotal,
     lastSummary,
     upForSeconds,
-    staleForSeconds,     // pode vir do backend
+    staleForSeconds,
     status,
-    intervalMinutes,     // { sync:number, reconcile:number }
+    intervalMinutes,
   } = hb || {};
 
   const { connected: sseConnected, latencyMs: sseLatencyMs, serverNow } = sse;
 
-  // Freshness “verdadeira” pelo relógio do server enviado no SSE (quando disponível)
+  // uptime vivo
+  const upDisplaySec = useMemo(() => {
+    if (startedAt) {
+      const started = typeof startedAt === "number" ? startedAt : new Date(startedAt).getTime();
+      return Math.max(0, Math.floor((now - started) / 1000));
+    }
+    return upForSeconds ?? 0;
+  }, [startedAt, upForSeconds, now]);
+
+  // stale real (preferindo relógio do servidor se presente)
   const computedStaleSec = useMemo(() => {
     if (staleForSeconds != null) return staleForSeconds;
-    if (!serverNow || !lastTickAt) return null;
+    const base = serverNow ?? now;
+    if (!base || !lastTickAt) return null;
     const last = typeof lastTickAt === "number" ? lastTickAt : new Date(lastTickAt).getTime();
-    return Math.max(0, Math.floor((serverNow - last) / 1000));
-  }, [staleForSeconds, serverNow, lastTickAt]);
+    return Math.max(0, Math.floor((base - last) / 1000));
+  }, [staleForSeconds, serverNow, lastTickAt, now]);
 
-  const staleDisplaySec = computedStaleSec ?? 0; // mostra 0s quando não dá pra calcular
-  // ETA do próximo tick com base no intervalo de sync (se existir)
+  const staleDisplaySec = computedStaleSec ?? 0;
+
   const nextEtaMs = useMemo(() => {
     const syncMin = intervalMinutes?.sync;
     if (!syncMin || !lastTickAt || !serverNow) return null;
     const last = typeof lastTickAt === "number" ? lastTickAt : new Date(lastTickAt).getTime();
     const intervalMs = syncMin * 60_000;
-    // próximo múltiplo de interval a partir do last
     const nextAt = last + intervalMs;
     return nextAt - serverNow;
   }, [intervalMinutes, lastTickAt, serverNow]);
 
-  // Status derivado (se o backend não apontar) com thresholds
   const derivedStatus = useMemo(() => {
     if (status) return status;
     const syncMin = intervalMinutes?.sync ?? 1;
-    const softStale = syncMin * 60 * 1.5; // 1.5x intervalo: alerta (amber)
-    const hardStale = syncMin * 60 * 3;   // 3x intervalo: degradado (red)
-   const s = staleDisplaySec;
-   if (s >= hardStale) return "degradado";
-   if (s >= softStale) return "stale";
+    const softStale = syncMin * 60 * 1.5;
+    const hardStale = syncMin * 60 * 3;
+    const s = staleDisplaySec;
+    if (s >= hardStale) return "degradado";
+    if (s >= softStale) return "stale";
     return "ok";
   }, [status, intervalMinutes, staleDisplaySec]);
 
@@ -85,7 +110,6 @@ export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLeg
       .map(([k, v]) => ({ k, v }));
   }, [lastSummary]);
 
-  // cor do ponto de status
   const dotCls =
     derivedStatus === "ok"
       ? "bg-emerald-500"
@@ -95,7 +119,6 @@ export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLeg
       ? "bg-rose-500"
       : "bg-neutral-400";
 
-  // erro% aproximado
   const errRate =
     typeof consecutiveErrors === "number" && typeof ticksTotal === "number" && ticksTotal > 0
       ? `${Math.round((consecutiveErrors / ticksTotal) * 100)}%`
@@ -116,7 +139,6 @@ export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLeg
           <Chip label="erro %" value={errRate} />
           {fase && <Chip label="fase" value={fase} intent="info" />}
 
-          {/* SSE quick status */}
           <Chip
             label="SSE"
             value={sseConnected ? "conectado" : "reconectando"}
@@ -143,9 +165,9 @@ export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLeg
 
       {/* KPIs */}
       <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Kpi label="Uptime" value={fmtSecs(upForSeconds ?? 0)} />
+        <Kpi label="Uptime" value={fmtSecs(upDisplaySec)} />
         <Kpi label="Stale" value={fmtSecs(staleDisplaySec)} />
-        <Kpi label="Ticks total" value={(typeof ticksTotal === 'number' ? ticksTotal : 0)} />
+        <Kpi label="Ticks total" value={typeof ticksTotal === "number" ? ticksTotal : 0} />
         <Kpi label="Últ. OK" value={lastOkAt ? new Date(lastOkAt).toLocaleTimeString() : "—"} />
       </div>
 
@@ -165,7 +187,6 @@ export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLeg
         <Info label="Últ. erro" value={lastError ? String(lastError) : "—"} />
       </div>
 
-      {/* RESUMO DA FASE */}
       {sumPairs.length > 0 && (
         <div className="mt-3 rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
           <div className="text-xs font-medium text-neutral-600 dark:text-neutral-300 mb-2">
@@ -179,14 +200,12 @@ export default function HeartbeatSummary({ hb, sse = {}, showLegends, setShowLeg
         </div>
       )}
 
-      {/* JSON RAW */}
       {showRaw && (
         <pre className="mt-3 max-h-56 md:max-h-64 w-full max-w-full overflow-x-auto overflow-y-auto rounded-lg bg-neutral-100/70 dark:bg-neutral-900/70 p-2 md:p-3 text-[11px] md:text-xs break-all">
 {JSON.stringify(hb, null, 2)}
         </pre>
       )}
 
-      {/* LEGENDA-FEET (fica sempre no rodapé, controlado por showLegends) */}
       {showLegends && <LegendFooter />}
     </div>
   );
