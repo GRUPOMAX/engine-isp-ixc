@@ -1,7 +1,7 @@
 // src/components/AdminConfig.jsx
 import { useCallback, useMemo, useState } from "react";
 import { useAdminConfig } from "@/hooks/useAdminConfig";
-import { getAdminToken, setAdminToken } from "@/lib/adminApi";
+import { setAdminToken, clearAdminToken } from "@/lib/adminApi"; // removido getAdminToken
 
 // Campos e rótulos (PORT travado)
 const FIELDS = [
@@ -24,76 +24,90 @@ const FIELDS = [
 ];
 
 function TokenGate({ onReady }) {
-  const [val, setVal] = useState(getAdminToken());
+  const [val, setVal] = useState(""); // sempre vazio; usuário digita toda vez
   const [show, setShow] = useState(false);
   const [err, setErr] = useState("");
 
   const save = () => {
     const tok = (val || "").trim();
     if (!tok) { setErr("Informe o token administrativo."); return; }
-    setAdminToken(tok);
-    onReady?.();
+    setAdminToken(tok);     // grava só em memória
+    onReady?.();            // libera a tela
   };
 
   const onKey = (e) => { if (e.key === "Enter") save(); };
 
   return (
     <div
-      className="rounded-2xl border border-zinc-200 bg-white p-4 md:p-6 max-w-2xl mx-auto text-zinc-900
+      className="mx-auto w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white text-zinc-900 shadow-sm
                  dark:border-zinc-700/50 dark:bg-zinc-900 dark:text-zinc-100"
       style={{
-        paddingTop: "calc(8px + env(safe-area-inset-top))",
-        paddingBottom: "calc(12px + env(safe-area-inset-bottom))",
+        paddingTop: "calc(12px + env(safe-area-inset-top))",
+        paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
       }}
     >
-      <h2 className="text-lg font-semibold mb-2">Autorização administrativa</h2>
-      <p className="text-sm opacity-70 mb-3">
-        Informe o token de admin para gerenciar as configurações do serviço.
-      </p>
-
-      <div className="flex gap-2 items-stretch">
-        <input
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          onKeyDown={onKey}
-          type={show ? "text" : "password"}
-          inputMode="text"
-          autoComplete="off"
-          className="w-full rounded-xl bg-white border border-zinc-300 px-3 py-3 md:py-2 outline-none
-                     focus:ring-2 focus:ring-sky-500
-                     dark:bg-zinc-800 dark:border-zinc-700"
-          placeholder="x-admin-token"
-        />
-        <button
-          onClick={() => setShow(s => !s)}
-          className="px-3 py-3 md:py-2 rounded-xl bg-zinc-100 border border-zinc-300 hover:bg-zinc-200
-                     dark:bg-zinc-800 dark:border-zinc-700 dark:hover:bg-zinc-700"
-          title={show ? "Ocultar" : "Mostrar"}
-          aria-label={show ? "Ocultar token" : "Mostrar token"}
-        >
-          {show ? "🙈" : "👁️"}
-        </button>
-        <button
-          onClick={save}
-          className="px-4 py-3 md:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
-        >
-          Entrar
-        </button>
+      <div className="px-4 pt-4 pb-3 sm:px-6">
+        <h2 className="text-base sm:text-lg font-semibold mb-1">Autorização administrativa</h2>
+        <p className="text-sm opacity-70">
+          Informe o token de admin para gerenciar as configurações do serviço.
+        </p>
       </div>
 
-      {err && <div className="mt-3 text-sm text-rose-600 dark:text-rose-400">{err}</div>}
+      {/* Inputs empilhados no mobile, inline no >=sm */}
+      <div className="px-4 pb-4 sm:px-6">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-stretch">
+          <input
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={onKey}
+            type={show ? "text" : "password"}
+            inputMode="text"
+            autoComplete="off"
+            autoFocus
+            aria-invalid={!!err}
+            className="w-full rounded-xl bg-white border border-zinc-300 px-3 py-3 text-[16px] outline-none
+                       focus:ring-2 focus:ring-sky-500
+                       dark:bg-zinc-800 dark:border-zinc-700"
+            placeholder="x-admin-token"
+          />
+          <button
+            onClick={() => setShow(s => !s)}
+            className="h-12 sm:h-auto px-3 py-3 rounded-xl bg-zinc-100 border border-zinc-300 hover:bg-zinc-200
+                       dark:bg-zinc-800 dark:border-zinc-700 dark:hover:bg-zinc-700"
+            title={show ? "Ocultar" : "Mostrar"}
+            aria-label={show ? "Ocultar token" : "Mostrar token"}
+          >
+            {show ? "🙈" : "👁️"}
+          </button>
+          <button
+            onClick={save}
+            className="h-12 sm:h-auto px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
+          >
+            Entrar
+          </button>
+        </div>
+
+        {err && <div className="mt-3 text-sm text-rose-600 dark:text-rose-400">{err}</div>}
+      </div>
     </div>
   );
 }
 
 export default function AdminConfig() {
-  const [authOk, setAuthOk] = useState(!!getAdminToken());
-  const handleUnauthorized = useCallback(() => setAuthOk(false), []);
+  const [authOk, setAuthOk] = useState(false); // sempre exige token
+
+  const handleUnauthorized = useCallback(() => {
+    clearAdminToken();     // zera memória
+    setAuthOk(false);      // volta a pedir token
+  }, []);
 
   const {
     base, form, setField, dirty, hasDirty,
     save, restart, exportEnv, busy, err, ok, reload
-  } = useAdminConfig({ onUnauthorized: handleUnauthorized });
+  } = useAdminConfig({
+    onUnauthorized: handleUnauthorized,
+    enabled: authOk, // 👈 só liga o hook depois do token passar
+  });
 
   // validações
   const problems = useMemo(() => {
@@ -118,7 +132,14 @@ export default function AdminConfig() {
 
   if (!authOk) {
     return (
-      <div className="p-4 md:p-6">
+      <div
+        className="p-3 sm:p-6"
+        style={{
+          minHeight: "100dvh",
+          paddingTop: "calc(8px + env(safe-area-inset-top))",
+          paddingBottom: "calc(84px + env(safe-area-inset-bottom))", // respiro pro botão flutuante "Menu"
+        }}
+      >
         <TokenGate onReady={() => setAuthOk(true)} />
       </div>
     );
@@ -126,57 +147,44 @@ export default function AdminConfig() {
 
   return (
     <div
-      className="mx-auto max-w-6xl p-4 md:p-6"
-      // Safe areas + espaço extra para o FAB “Menu” não cobrir os inputs
+      className="mx-auto max-w-6xl p-3 sm:p-6"
       style={{
-        paddingTop: "calc(10px + env(safe-area-inset-top))",
-        paddingBottom: "calc(84px + env(safe-area-inset-bottom))",
+        paddingTop: "calc(8px + env(safe-area-inset-top))",
+        paddingBottom: "calc(96px + env(safe-area-inset-bottom))", // espaço pro FAB/gestos
       }}
     >
       {/* Header + ações (empilha no mobile) */}
-      <div className="mb-5 md:mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="mb-4 sm:mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-semibold">Configurações do Engine ISP/IXC</h1>
+          <h1 className="text-lg sm:text-2xl font-semibold">Configurações do Engine ISP/IXC</h1>
           <p className="text-sm opacity-70">Edite parâmetros de runtime e persistência segura.</p>
         </div>
 
-        {/* Ações: grid no mobile para ficar tocável */}
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-          <button
-            onClick={reload}
-            disabled={busy}
-            className="px-3 py-3 sm:py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-100
-                       dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-          >
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+          <button onClick={reload} disabled={busy}
+            className="h-12 sm:h-auto px-3 py-3 sm:py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-100
+                       dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800">
             Atualizar
           </button>
-          <button
-            onClick={exportEnv}
-            disabled={busy}
-            className="px-3 py-3 sm:py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-100
+          <button onClick={exportEnv} disabled={busy}
+            className="h-12 sm:h-auto px-3 py-3 sm:py-2 rounded-xl border border-zinc-300 bg-white hover:bg-zinc-100
                        dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-            title="Gera .env.generated"
-          >
+            title="Gera .env.generated">
             Exportar .env
           </button>
-          <button
-            onClick={restart}
-            disabled={busy}
-            className="col-span-2 sm:col-span-1 px-3 py-3 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-medium
+          <button onClick={restart} disabled={busy}
+            className="h-12 sm:h-auto px-3 py-3 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-medium
                        dark:bg-amber-600 dark:hover:bg-amber-500"
-            title="Reinicia o serviço (PM2 religará)"
-          >
+            title="Reinicia o serviço (PM2 religará)">
             Reiniciar agora
           </button>
         </div>
       </div>
 
       {(err || ok) && (
-        <div
-          className={`mb-4 rounded-xl p-3 border ${
-            err ? "border-rose-500/40 bg-rose-500/10" : "border-emerald-500/40 bg-emerald-500/10"
-          }`}
-        >
+        <div className={`mb-4 rounded-xl p-3 border ${
+          err ? "border-rose-500/40 bg-rose-500/10" : "border-emerald-500/40 bg-emerald-500/10"
+        }`}>
           <div className="text-sm">{err || ok}</div>
         </div>
       )}
@@ -184,15 +192,12 @@ export default function AdminConfig() {
       {!base && <div className="text-sm opacity-70">Carregando…</div>}
 
       {base && (
-        // 1 coluna no mobile, 2 no md+
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-4">
           {FIELDS.map(({ key, label, type, min, placeholder, readonly }) => (
-            <div
-              key={key}
-              className="rounded-2xl border border-zinc-300 bg-white p-3 md:p-4 text-zinc-900
-                         dark:border-zinc-700/50 dark:bg-zinc-900 dark:text-zinc-100"
-            >
-              <label className="block text-sm font-medium mb-1">{label}</label>
+            <div key={key}
+              className="rounded-2xl border border-zinc-300 bg-white p-3 sm:p-4 text-zinc-900 shadow-sm
+                         dark:border-zinc-700/50 dark:bg-zinc-900 dark:text-zinc-100">
+              <label className="block text-[13px] sm:text-sm font-medium mb-1">{label}</label>
               <input
                 type={type || "text"}
                 min={min}
@@ -203,7 +208,7 @@ export default function AdminConfig() {
                 readOnly={!!readonly}
                 title={readonly ? "Campo bloqueado" : undefined}
                 inputMode={type === "number" ? "numeric" : undefined}
-                className={`w-full rounded-xl px-3 py-3 md:py-2 outline-none focus:ring-2 focus:ring-sky-500
+                className={`w-full rounded-xl px-3 py-3 sm:py-2 text-[16px] outline-none focus:ring-2 focus:ring-sky-500
                             bg-white border border-zinc-300
                             disabled:cursor-not-allowed disabled:opacity-70
                             dark:bg-zinc-800 dark:border-zinc-700`}
@@ -228,14 +233,11 @@ export default function AdminConfig() {
         </div>
       )}
 
-      {/* Barra de ações fixa no fim da página em telas pequenas */}
-      <div
-        className="mt-6 md:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3"
-      >
+      <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
         <button
           onClick={save}
           disabled={busy || !hasDirty || problems.length > 0}
-          className={`px-5 py-3 md:py-2 rounded-xl font-medium ${
+          className={`h-12 sm:h-auto px-5 py-3 sm:py-2 rounded-xl font-medium ${
             busy || !hasDirty || problems.length > 0
               ? "bg-zinc-200 text-zinc-500 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-400"
               : "bg-emerald-600 hover:bg-emerald-500 text-white"

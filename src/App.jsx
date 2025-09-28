@@ -1,3 +1,5 @@
+// src/App.jsx
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import useTheme from "@/hooks/useTheme";
 import useAuth from "@/hooks/useAuth";
@@ -11,6 +13,13 @@ import Login from "@/pages/Login";
 import CacheSyncPage from "@/pages/CacheSyncPage";
 import AdminConfig from "@/pages/AdminConfig";
 
+// apenas para exibir/confirmar o modal pós-login
+import TokenModal from "@/components/TokenModal";
+import { confirmSavedToken } from "@/lib/adminApi";
+
+/* --------------------------------
+ * ROTA PROTEGIDA
+ * -------------------------------- */
 function Protected({ children }) {
   const { isAuthed } = useAuth();
   const location = useLocation();
@@ -18,17 +27,47 @@ function Protected({ children }) {
   return children;
 }
 
+/* --------------------------------
+ * SHELL (abre modal somente se houver token no localStorage)
+ * -------------------------------- */
 function Shell({ children }) {
   const { toggle } = useTheme();
   const { isAuthed, logout } = useAuth();
+
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [freshToken, setFreshToken] = useState("");
+
+  useEffect(() => {
+    if (!isAuthed) return;
+    const t = localStorage.getItem("frontisp_fresh_token");
+    if (t) {
+      setFreshToken(t);
+      setTokenModalOpen(true);
+    }
+  }, [isAuthed]);
+
   return (
     <div className="min-h-screen overflow-x-hidden">
       <Header onToggleTheme={toggle} isAuthed={isAuthed} onLogout={logout} />
       <main className="mx-auto max-w-6xl px-4 py-6 pb-24 md:pb-6">{children}</main>
+
+      <TokenModal
+        open={tokenModalOpen}
+        token={freshToken}
+        onClose={async () => {
+          try { await confirmSavedToken(); } catch {}
+          setTokenModalOpen(false);
+          setFreshToken("");
+          localStorage.removeItem("frontisp_fresh_token");
+        }}
+      />
     </div>
   );
 }
 
+/* --------------------------------
+ * DASHBOARD & VISION
+ * -------------------------------- */
 function Dashboard() {
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -44,6 +83,9 @@ function Vision() {
   return <AdminNeural />;
 }
 
+/* --------------------------------
+ * APP ROUTER
+ * -------------------------------- */
 export default function App() {
   return (
     <Routes>
@@ -75,7 +117,7 @@ export default function App() {
           </Protected>
         }
       />
-      {/* NOVO: página de configuração */}
+      {/* Config */}
       <Route
         path="/config"
         element={

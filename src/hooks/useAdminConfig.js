@@ -26,18 +26,19 @@ export const ALLOWED_KEYS = [
   "RECONCILE_JITTER_MAX_SEC",
 ];
 
-export function useAdminConfig(opts = {}) {
-  const { onUnauthorized } = opts;
+export function useAdminConfig({ onUnauthorized, enabled = true } = {}) {
   const [base, setBase] = useState(null);
   const [form, setForm] = useState({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-    // mantém a ref sempre atual sem forçar recriações de efeito
+
+  // mantém a ref sempre atual sem forçar recriações de efeito
   const onUnauthorizedRef = useRef(onUnauthorized);
   useEffect(() => { onUnauthorizedRef.current = onUnauthorized; }, [onUnauthorized]);
 
   const load = useCallback(async () => {
+    if (!enabled) return;                         // ⛔ não roda sem token
     setErr(""); setOk("");
     setBusy(true);
     try {
@@ -46,28 +47,28 @@ export function useAdminConfig(opts = {}) {
       setBase(data);
       setForm(data);
     } catch (e) {
-      // se 401, derruba para TokenGate sem exibir banner de erro
-      if (e && e.status === 401) {
+      if (e && (e.status === 401 || e.status === 403)) {
         setBase(null);
         setForm({});
-        if (typeof onUnauthorizedRef.current === "function") onUnauthorizedRef.current();
+        onUnauthorizedRef.current?.();
         return;
       }
-      setErr(String(e.message || e));
+      setErr(String(e?.message || e));
     } finally {
       setBusy(false);
     }
-  }, [onUnauthorized]);
+  }, [enabled]);
 
-  // efeito de montagem com guarda de desmontagem
+  // monta somente quando enabled=true; re-carrega ao virar true
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     (async () => {
       await load();
       if (!alive) return;
     })();
     return () => { alive = false; };
-  }, [load]);
+  }, [enabled, load]);
 
   const setField = useCallback((k, v) => {
     setForm(prev => ({ ...prev, [k]: v }));
@@ -89,7 +90,7 @@ export function useAdminConfig(opts = {}) {
   const hasDirty = Object.keys(dirty).length > 0;
 
   const save = useCallback(async () => {
-    if (!hasDirty) return;
+    if (!enabled || !hasDirty) return;           // ⛔ sem token ou sem mudanças
     setErr(""); setOk("");
     setBusy(true);
     try {
@@ -101,49 +102,55 @@ export function useAdminConfig(opts = {}) {
       setOk("Configurações atualizadas.");
       await load();
     } catch (e) {
-      if (e && e.status === 401) {
-        if (typeof onUnauthorizedRef.current === "function") onUnauthorizedRef.current();
+      if (e && (e.status === 401 || e.status === 403)) {
+        onUnauthorizedRef.current?.();
         return;
       }
-      setErr(String(e.message || e));
+      setErr(String(e?.message || e));
     } finally {
       setBusy(false);
     }
-  }, [dirty, hasDirty, load]);
+  }, [enabled, dirty, hasDirty, load]);
 
   const restart = useCallback(async () => {
+    if (!enabled) return;                         // ⛔
     setErr(""); setOk("");
     setBusy(true);
     try {
       await adminApi.restart();
       setOk("Reinício solicitado. (PM2 vai religar o serviço)");
     } catch (e) {
-      if (e && e.status === 401) {
-        if (typeof onUnauthorized === "function") onUnauthorized();
+      if (e && (e.status === 401 || e.status === 403)) {
+        onUnauthorizedRef.current?.();
         return;
       }
-      setErr(String(e.message || e));
+      setErr(String(e?.message || e));
     } finally {
       setBusy(false);
     }
-  }, []); // <- NÃO depende mais da identidade do callback
+  }, [enabled]);
 
   const exportEnv = useCallback(async () => {
+    if (!enabled) return;                         // ⛔
     setErr(""); setOk("");
     setBusy(true);
     try {
       const res = await adminApi.exportEnv();
       setOk(`Arquivo gerado: ${res.file || ".env.generated"}`);
     } catch (e) {
-      if (e && e.status === 401) {
-        if (typeof onUnauthorizedRef.current === "function") onUnauthorizedRef.current();
+      if (e && (e.status === 401 || e.status === 403)) {
+        onUnauthorizedRef.current?.();
         return;
       }
-      setErr(String(e.message || e));
+      setErr(String(e?.message || e));
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [enabled]);
 
-  return { base, form, setField, dirty, hasDirty, save, restart, exportEnv, busy, err, ok, reload: load };
+  return {
+    base, form, setField, dirty, hasDirty,
+    save, restart, exportEnv, busy, err, ok,
+    reload: load,
+  };
 }

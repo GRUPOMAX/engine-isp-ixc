@@ -1,21 +1,29 @@
 // src/pages/Login.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+
 import { sha256Hex } from '@/lib/crypto';
 import { findUserByEmailAndHash } from '@/lib/nocodb';
+import { ensureServerToken, setAdminToken } from '@/lib/adminApi';
 
-export default function Login() {
+function coerceIsAdmin(v) {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number')  return v === 1;
+  if (typeof v === 'string')  return v.trim() === '1' || v.trim().toLowerCase() === 'true';
+  return false;
+}
+
+function Login() {
   const [email, setEmail] = useState('');
   const [pass, setPass]   = useState('');
   const [show, setShow]   = useState(false);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+  const [err, setErr]     = useState('');
 
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || "/";
 
-  // Se já estiver logado, manda pra rota pretendida (ou '/')
   useEffect(() => {
     const raw = localStorage.getItem('frontisp_auth');
     if (raw) navigate(from, { replace: true });
@@ -31,10 +39,39 @@ export default function Login() {
       const user = await findUserByEmailAndHash(email.trim(), passHash);
       if (!user) {
         setErr('Credenciais inválidas.');
-      } else {
-        localStorage.setItem('frontisp_auth', JSON.stringify({ id: user.Id, email: user['user-email'] }));
-        navigate(from, { replace: true });
+        return;
       }
+
+      const userEmail = String(
+        user.email ?? user['user-email'] ?? user['user_email'] ?? user['Email'] ?? ''
+      ).trim();
+
+      if (!userEmail) {
+        setErr('Conta sem e-mail. Contate o administrador.');
+        return;
+      }
+
+      localStorage.setItem('frontisp_auth', JSON.stringify({ id: user.Id, email: userEmail }));
+
+      const isAdmin = coerceIsAdmin(user.is_admin);
+      if (!isAdmin) {
+        navigate(from, { replace: true });
+        return;
+      }
+
+      // Cria/renova token no servidor e DEFERRE o modal para depois da navegação
+      try {
+        const { created, token } = await ensureServerToken(userEmail);
+        if (created && token) {
+          setAdminToken(token);
+          // armazena token recém-criado para o Shell exibir o modal depois
+          localStorage.setItem('frontisp_fresh_token', token);
+        }
+      } catch {
+        // silencioso; se falhar, só navega
+      }
+
+      navigate(from, { replace: true });
     } catch {
       setErr('Falha na autenticação. Verifique conexão e permissões.');
     } finally {
@@ -43,8 +80,10 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-900 to-neutral-950 text-neutral-100 flex items-center justify-center px-4"
-         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div
+      className="min-h-screen bg-gradient-to-b from-neutral-950 via-neutral-900 to-neutral-950 text-neutral-100 flex items-center justify-center px-4"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="w-full max-w-md">
         <div className="relative overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900/60 backdrop-blur">
           <div className="pointer-events-none absolute inset-x-0 -top-24 h-48 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/20 via-transparent to-transparent" />
@@ -67,7 +106,6 @@ export default function Login() {
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  // iOS: 16px reais para evitar zoom ao focar
                   className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-base outline-none focus:border-cyan-500"
                   placeholder="voce@empresa.com"
                   autoComplete="email"
@@ -101,7 +139,7 @@ export default function Login() {
                     onClick={() => setShow(s => !s)}
                     className="absolute inset-y-0 right-0 px-3 text-xs text-neutral-400 hover:text-neutral-200"
                     aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
-                    tabIndex={-1} // evita foco acidental no iOS
+                    tabIndex={-1}
                   >
                     {show ? 'Ocultar' : 'Mostrar'}
                   </button>
@@ -132,3 +170,5 @@ export default function Login() {
     </div>
   );
 }
+
+export default Login;
